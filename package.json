@@ -6,6 +6,7 @@
   "types": "build/index.d.ts",
   "scripts": {
     "start": "npx ts-node --project tsconfig.json src/index.ts",
+    "genpk": "npx ts-node --project tsconfig.json src/utils.ts genpk",
     "test": "npx ts-node node_modules/jasmine/bin/jasmine --config=jasmine.json",
     "build": "npx tsc",
     "prepare": "npm run build",
