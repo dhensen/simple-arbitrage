@@ -8,7 +8,7 @@ import { get } from "https";
 import { getDefaultRelaySigningKey } from "./utils";
 
 const USE_TESTNET = process.env.USE_TESTNET === "true";
-console.log(USE_TESTNET);
+
 const ETHEREUM_RPC_URL =
   process.env.ETHEREUM_RPC_URL || "http://127.0.0.1:8545";
 const PRIVATE_KEY = process.env.PRIVATE_KEY || "";
@@ -59,7 +59,6 @@ const connectionInfo = {
   user: INFURA_API_USER,
   password: INFURA_API_SECRET,
 };
-console.log(connectionInfo);
 const provider = new providers.StaticJsonRpcProvider(connectionInfo);
 
 const arbitrageSigningWallet = new Wallet(PRIVATE_KEY);
@@ -110,6 +109,7 @@ async function main() {
     FACTORY_ADDRESSES
   );
   provider.on("block", async (blockNumber) => {
+    console.log(`blockNumber: ${blockNumber}`);
     await UniswappyV2EthPair.updateReserves(provider, markets.allMarketPairs);
     const bestCrossedMarkets = await arbitrage.evaluateMarkets(
       markets.marketsByToken
