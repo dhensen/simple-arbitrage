@@ -9,6 +9,12 @@ import { getDefaultRelaySigningKey } from "./utils";
 
 const USE_TESTNET = process.env.USE_TESTNET === "true";
 
+let CHAIN_ID = 1;
+
+if (USE_TESTNET) {
+  CHAIN_ID = 5;
+}
+
 const ETHEREUM_RPC_URL =
   process.env.ETHEREUM_RPC_URL || "http://127.0.0.1:8545";
 const PRIVATE_KEY = process.env.PRIVATE_KEY || "";
@@ -110,6 +116,7 @@ async function main() {
   );
   provider.on("block", async (blockNumber) => {
     console.log(`blockNumber: ${blockNumber}`);
+    const block = await provider.getBlock(blockNumber);
     await UniswappyV2EthPair.updateReserves(provider, markets.allMarketPairs);
     const bestCrossedMarkets = await arbitrage.evaluateMarkets(
       markets.marketsByToken
@@ -119,11 +126,15 @@ async function main() {
       return;
     }
     bestCrossedMarkets.forEach(Arbitrage.printCrossedMarket);
+    const gasPrice = await provider.getGasPrice();
     arbitrage
       .takeCrossedMarkets(
         bestCrossedMarkets,
         blockNumber,
-        MINER_REWARD_PERCENTAGE
+        MINER_REWARD_PERCENTAGE,
+        block,
+        CHAIN_ID,
+        gasPrice
       )
       .then(healthcheck)
       .catch(console.error);

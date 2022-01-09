@@ -4,6 +4,7 @@ import { FlashbotsBundleProvider } from "@flashbots/ethers-provider-bundle";
 import { WETH_ADDRESS } from "./addresses";
 import { EthMarket } from "./EthMarket";
 import { ETHER, bigNumberToDecimal } from "./utils";
+import { Block } from "@ethersproject/abstract-provider";
 
 export interface CrossedMarketDetails {
   profit: BigNumber;
@@ -171,7 +172,10 @@ export class Arbitrage {
   async takeCrossedMarkets(
     bestCrossedMarkets: CrossedMarketDetails[],
     blockNumber: number,
-    minerRewardPercentage: number
+    minerRewardPercentage: number,
+    block: Block,
+    chainId: number,
+    gasPrice: BigNumber
   ): Promise<void> {
     for (const bestCrossedMarket of bestCrossedMarkets) {
       console.log(
@@ -206,6 +210,21 @@ export class Arbitrage {
       const minerReward = bestCrossedMarket.profit
         .mul(minerRewardPercentage)
         .div(100);
+      const GWEI = BigNumber.from(10).pow(9);
+      const PRIORITY_FEE = GWEI.mul(3);
+      const LEGACY_GAS_PRICE = GWEI.mul(12);
+      const BLOCKS_IN_THE_FUTURE = 2;
+
+      if (block.baseFeePerGas == null) {
+        console.warn("This chain is not EIP-1559 enabled. Stopping");
+        return;
+      }
+
+      const maxBaseFeeInFutureBlock =
+        FlashbotsBundleProvider.getMaxBaseFeeInFutureBlock(
+          block.baseFeePerGas,
+          BLOCKS_IN_THE_FUTURE
+        );
       const transaction =
         await this.bundleExecutorContract.populateTransaction.uniswapWeth(
           bestCrossedMarket.volume,
@@ -213,16 +232,28 @@ export class Arbitrage {
           targets,
           payloads,
           {
-            gasPrice: BigNumber.from(0),
-            gasLimit: BigNumber.from(1000000),
+            maxFeePerGas: PRIORITY_FEE.add(maxBaseFeeInFutureBlock),
+            maxPriorityFeePerGas: PRIORITY_FEE,
+            gasLimit: 60000,
+            type: 2,
           }
         );
+      const gasWasteTransaction = {
+        to: this.executorWallet.address,
+        type: 2,
+        maxFeePerGas: PRIORITY_FEE.add(maxBaseFeeInFutureBlock),
+        maxPriorityFeePerGas: PRIORITY_FEE,
+        gasLimit: 21000,
+        data: "0x",
+        chainId,
+      };
 
       try {
         const estimateGas =
           await this.bundleExecutorContract.provider.estimateGas({
             ...transaction,
             from: this.executorWallet.address,
+            chainId,
           });
         if (estimateGas.gt(1400000)) {
           console.log(
@@ -233,15 +264,24 @@ export class Arbitrage {
         }
         transaction.gasLimit = estimateGas.mul(2);
       } catch (e) {
+        console.error(e);
         console.warn(
-          `Estimate gas failure for ${JSON.stringify(bestCrossedMarket)}`
+          `Estimate gas failure for ${JSON.stringify(
+            bestCrossedMarket,
+            null,
+            4
+          )}`
         );
         continue;
       }
       const bundledTransactions = [
         {
           signer: this.executorWallet,
-          transaction: transaction,
+          transaction: { ...transaction, chainId },
+        },
+        {
+          signer: this.executorWallet,
+          transaction: gasWasteTransaction,
         },
       ];
       console.log(bundledTransactions);
