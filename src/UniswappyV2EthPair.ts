@@ -104,6 +104,10 @@ export class UniswappyV2EthPair extends EthMarket {
       }
     }
 
+    console.log(
+      `found ${marketPairs.length} marketPairs for ${factoryAddress}`
+    );
+
     return marketPairs;
   }
 
