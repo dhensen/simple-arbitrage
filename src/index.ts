@@ -1,3 +1,7 @@
+import dotenv from "dotenv";
+
+dotenv.config();
+
 import { FlashbotsBundleProvider } from "@flashbots/ethers-provider-bundle";
 import { Contract, providers, Wallet } from "ethers";
 import { BUNDLE_EXECUTOR_ABI } from "./abi";
@@ -6,6 +10,7 @@ import { FACTORY_ADDRESSES } from "./addresses";
 import { Arbitrage } from "./Arbitrage";
 import { get } from "https";
 import { getDefaultRelaySigningKey } from "./utils";
+import { formatEther } from "ethers/lib/utils";
 
 const USE_TESTNET = process.env.USE_TESTNET === "true";
 
@@ -18,7 +23,8 @@ if (USE_TESTNET) {
 const ETHEREUM_RPC_URL =
   process.env.ETHEREUM_RPC_URL || "http://127.0.0.1:8545";
 const PRIVATE_KEY = process.env.PRIVATE_KEY || "";
-const BUNDLE_EXECUTOR_ADDRESS = process.env.BUNDLE_EXECUTOR_ADDRESS || "";
+const BUNDLE_EXECUTOR_CONTRACT_ADDRESS =
+  process.env.BUNDLE_EXECUTOR_CONTRACT_ADDRESS || "";
 
 const FLASHBOTS_RELAY_SIGNING_KEY =
   process.env.FLASHBOTS_RELAY_SIGNING_KEY || getDefaultRelaySigningKey();
@@ -31,9 +37,9 @@ if (PRIVATE_KEY === "") {
   console.warn("Must provide PRIVATE_KEY environment variable");
   process.exit(1);
 }
-if (BUNDLE_EXECUTOR_ADDRESS === "") {
+if (BUNDLE_EXECUTOR_CONTRACT_ADDRESS === "") {
   console.warn(
-    "Must provide BUNDLE_EXECUTOR_ADDRESS environment variable. Please see README.md"
+    "Must provide BUNDLE_EXECUTOR_CONTRACT_ADDRESS environment variable. Please see README.md"
   );
   process.exit(1);
 }
@@ -67,7 +73,7 @@ const connectionInfo = {
 };
 const provider = new providers.StaticJsonRpcProvider(connectionInfo);
 
-const arbitrageSigningWallet = new Wallet(PRIVATE_KEY);
+const arbitrageSigningWallet = new Wallet(PRIVATE_KEY, provider);
 const flashbotsRelaySigningWallet = new Wallet(FLASHBOTS_RELAY_SIGNING_KEY);
 
 function healthcheck() {
@@ -96,18 +102,25 @@ async function createFlashBotBundleProvider() {
 }
 
 async function main() {
+  const balance = await arbitrageSigningWallet.getBalance();
   console.log(
     "Searcher Wallet Address: " + (await arbitrageSigningWallet.getAddress())
   );
+  console.log(`current ETH balance: ${formatEther(balance.toString())}`);
   console.log(
     "Flashbots Relay Signing Wallet Address: " +
       (await flashbotsRelaySigningWallet.getAddress())
   );
+
   const flashbotsProvider = await createFlashBotBundleProvider();
   const arbitrage = new Arbitrage(
     arbitrageSigningWallet,
     flashbotsProvider,
-    new Contract(BUNDLE_EXECUTOR_ADDRESS, BUNDLE_EXECUTOR_ABI, provider)
+    new Contract(
+      BUNDLE_EXECUTOR_CONTRACT_ADDRESS,
+      BUNDLE_EXECUTOR_ABI,
+      provider
+    )
   );
 
   const markets = await UniswappyV2EthPair.getUniswapMarketsByToken(

@@ -5,6 +5,7 @@ import { WETH_ADDRESS } from "./addresses";
 import { EthMarket } from "./EthMarket";
 import { ETHER, bigNumberToDecimal } from "./utils";
 import { Block } from "@ethersproject/abstract-provider";
+import { formatEther } from "ethers/lib/utils";
 
 export interface CrossedMarketDetails {
   profit: BigNumber;
@@ -90,9 +91,9 @@ export function getBestCrossedMarket(
 }
 
 export class Arbitrage {
+  private executorWallet: Wallet;
   private flashbotsProvider: FlashbotsBundleProvider;
   private bundleExecutorContract: Contract;
-  private executorWallet: Wallet;
 
   constructor(
     executorWallet: Wallet,
@@ -180,9 +181,9 @@ export class Arbitrage {
     for (const bestCrossedMarket of bestCrossedMarkets) {
       console.log(
         "Send this much WETH",
-        bestCrossedMarket.volume.toString(),
+        formatEther(bestCrossedMarket.volume),
         "get this much profit",
-        bestCrossedMarket.profit.toString()
+        formatEther(bestCrossedMarket.profit)
       );
       const buyCalls =
         await bestCrossedMarket.buyFromMarket.sellTokensToNextMarket(
@@ -272,7 +273,10 @@ export class Arbitrage {
             4
           )}`
         );
-        continue;
+
+        // there is an estimate gas failure, I dont know why, but just set gas limit to 80K and not continue.
+        transaction.gasLimit = BigNumber.from(80000);
+        // continue;
       }
       const bundledTransactions = [
         {
