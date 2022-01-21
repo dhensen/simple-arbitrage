@@ -2,6 +2,10 @@ import { BigNumber, Contract, providers } from "ethers";
 import { ConnectionInfo, formatEther } from "ethers/lib/utils";
 import { sys } from "typescript";
 import * as fs from "fs";
+import dotenv from "dotenv";
+
+dotenv.config();
+
 
 function getEnvValue(name: string): string {
   const value = process.env[name];
@@ -36,7 +40,7 @@ let previousWethBalance: number;
 provider.on("block", async (blockNumber) => {
   console.log(blockNumber);
   //   console.log(address);
-    
+
 //   const balance = await provider.getBalance(address);
 //     console.log(balance);
 
